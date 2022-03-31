@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Advanced.API.Practice.Entities;
 using DAL.DbContexts;
+using Microsoft.Extensions.Caching.Memory;
 using Shared;
 
 namespace Advanced.API.Practice.Controllers
@@ -15,32 +16,47 @@ namespace Advanced.API.Practice.Controllers
     [ApiController]
     public class TeachersController : ControllerBase
     {
+        private readonly IMemoryCache _memoryCache;
         private readonly TeacherContext _context;
 
-        public TeachersController(TeacherContext context)
+        public TeachersController(IMemoryCache memoryCache, TeacherContext context)
         {
+            _memoryCache = memoryCache;
             _context = context;
         }
 
         [HttpPost("list")]
-        public async Task<ActionResult<IEnumerable<Teacher>>> GetTeachers([FromBody] Paging page)
+        public async Task<List<Teacher>> GetTeachers([FromBody] Paging page)
         {
-            var list = await _context.Teachers.Include(z => z.Courses).Where(s => s.FirstName.Contains(page.SearchString ?? string.Empty)).DefaultIfEmpty().ToListAsync();
-
-            if (page == null || page.Size == 0)
+            var cacheKey = "teacherList";
+            //checks if cache entries exists
+            if (!_memoryCache.TryGetValue(cacheKey, out List<Teacher> list))
             {
-                list.ToList();
-            }
-            else
-            {
-                list.Take(page.Size * page.PageNumber)
-                    .Skip(page.Size * (page.PageNumber - 1));
-            }
-            
-            Response.Headers.Add("X-Total-Count", list.Count.ToString());
-            Response.Headers.Add("Accept", "application/json");
+                 list = await _context.Teachers.Include(z => z.Courses).ToListAsync();
 
-            return list;
+                if (page == null || page.Size == 0)
+                {
+                    list
+                        .Where(s => s.FirstName.Contains(page.SearchString ?? string.Empty)).DefaultIfEmpty().ToList();
+                }
+                else
+                {
+                    list
+                        .Where(s => s.FirstName.Contains(page.SearchString ?? string.Empty)).DefaultIfEmpty().Take(page.Size * page.PageNumber)
+                        .Skip(page.Size * (page.PageNumber - 1));
+                }
+                var cacheExpiryOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpiration = DateTime.Now.AddSeconds(50),
+                    Priority = CacheItemPriority.High,
+                    SlidingExpiration = TimeSpan.FromSeconds(20)
+                };
+                //setting cache entries
+                _memoryCache.Set(cacheKey, list, cacheExpiryOptions);
+                Response.Headers.Add("Accept", "application/json");
+            }
+
+            return  list;
         }
 
         [HttpGet("{id}")]

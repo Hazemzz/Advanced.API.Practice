@@ -29,6 +29,7 @@ namespace Advanced.API.Practice
                     options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
                 );
             services.AddSwaggerGen();
+            services.AddMemoryCache();
             services.AddCors(o => o.AddPolicy("MyPolicy", builder =>
             {
                 builder.AllowAnyOrigin()
