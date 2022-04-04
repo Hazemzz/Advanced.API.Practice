@@ -1,10 +1,12 @@
 ﻿using System;
 using Advanced.API.Practice.Entities;
+using DAL.Entities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace DAL.DbContexts
 {
-    public class TeacherContext : DbContext
+    public class TeacherContext : IdentityDbContext<ApplicationUser>
     {
         public TeacherContext(DbContextOptions<TeacherContext> options)
            : base(options)
